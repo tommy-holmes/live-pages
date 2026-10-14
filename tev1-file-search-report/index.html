@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Does a local decision model help a coding agent choose which file to read? — Tev1 test report</title>
+<meta name="description" content="A controlled test of Tev1 (4B) running locally via Ollama as an advisor to a frontier coding agent: 216 real tasks, 5 repositories, 5 methods compared.">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10); --track:#eceae4; --wash:#f2f1ed;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --base:#898781;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --track:#262624; --wash:#222220;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --base:#898781;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --track:#262624; --wash:#222220;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --base:#898781;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:880px;margin:0 auto;padding:0 16px 80px}
+h1{font-size:clamp(26px,5.6vw,40px);line-height:1.15;margin:.2em 0 .35em;font-weight:650;letter-spacing:-.01em}
+h2{font-size:clamp(20px,3.6vw,26px);line-height:1.25;margin:0 0 .5em;font-weight:650}
+h3{font-size:17px;margin:1.3em 0 .35em;font-weight:650}
+p{margin:.55em 0}
+a{color:var(--s1)}
+small,.muted{color:var(--ink2)}
+.eyebrow{color:var(--ink2);font-size:14px;margin:28px 0 0}
+.lede{font-size:clamp(17px,2.4vw,19px);color:var(--ink2);max-width:62ch}
+.topbar{display:flex;justify-content:flex-end;padding:10px 16px 0;max-width:880px;margin:0 auto}
+button{font:inherit;color:inherit}
+.btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:36px}
+.btn:hover{background:var(--wash)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 18px;margin:18px 0}
+@media (min-width:700px){.card{padding:26px 28px}}
+.callout{border-left:4px solid var(--s1)}
+.callout.scope{border-left-color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:22px 0 6px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 14px 12px}
+.tile .v{font-size:38px;line-height:1.05;font-weight:650;margin:.1em 0 .1em}
+.tile .l{font-size:14px;color:var(--ink2)}
+.tile .s{font-size:13px;color:var(--muted);margin-top:2px}
+.key{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px;vertical-align:-1px}
+.toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;margin:14px 0 4px}
+.toc a{color:var(--ink2);text-decoration:none;border-bottom:1px solid var(--axis)}
+.toc a:hover{color:var(--ink)}
+.cols{display:grid;gap:14px}
+@media (min-width:700px){.cols.two{grid-template-columns:1fr 1fr}}
+ul,ol{padding-left:1.25em;margin:.5em 0}
+li{margin:.3em 0}
+code{font:13.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--wash);padding:1px 5px;border-radius:5px}
+.tag{display:inline-block;font-size:12px;border:1px solid var(--axis);border-radius:999px;padding:0 8px;margin-left:6px;color:var(--ink2);vertical-align:1px;white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--grid);vertical-align:top}
+th{font-weight:600;color:var(--ink2);font-size:13px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto}
+
+.exp{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 18px;margin:18px 0}
+.exp.off{border-style:dashed;background:transparent}
+.exp-h{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.exp-h h2{margin:0;font-size:clamp(24px,5vw,32px)}
+.num{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);font-weight:650}
+.q{font-size:18px;line-height:1.45;margin:.4em 0 1em}
+.vs{display:grid;gap:12px}
+.vrow{display:grid;grid-template-columns:1fr auto;grid-template-areas:"who num" "bar bar";gap:4px 10px;align-items:end}
+.who{grid-area:who;font-size:16px;font-weight:600}
+.who i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:8px}
+.vnum{grid-area:num;font-size:34px;line-height:1;font-weight:700}
+.vbar{grid-area:bar;height:22px;background:var(--track);border-radius:4px}
+.vbar b{display:block;height:100%;border-radius:0 4px 4px 0}
+.vrow.dim .who{font-weight:500;color:var(--ink2)}
+.vrow.dim .vnum{font-size:22px;color:var(--ink2)}
+.read1{font-size:14.5px;color:var(--ink2);margin:.8em 0}
+.verdict2{background:var(--wash);border-left:4px solid var(--s2);border-radius:8px;padding:12px 14px;font-size:17px;line-height:1.45;margin:14px 0}
+.facts{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px;font-size:16px}
+.scope2{display:grid;gap:10px;font-size:15.5px;margin:6px 0 4px}
+.tag2{display:inline-block;font-size:12.5px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--ink);color:var(--surface);margin-right:8px}
+.tag2.no{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+@media (min-width:700px){.vrow{grid-template-columns:200px 1fr auto;grid-template-areas:"who bar num";align-items:center}.scope2{grid-template-columns:1fr 1fr}}
+/* controls */
+.filters{display:flex;flex-wrap:wrap;gap:10px 18px;margin:6px 0 14px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{background:transparent;border:0;padding:7px 12px;cursor:pointer;min-height:38px;font-size:14px;border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.seg button:not([aria-pressed="true"]):hover{background:var(--wash)}
+.flabel{font-size:12.5px;color:var(--ink2);display:block;margin-bottom:3px}
+/* method bars */
+.mrow{display:grid;grid-template-columns:1fr;gap:3px;padding:7px 0;outline-offset:2px;border-radius:8px}
+@media (min-width:640px){.mrow{grid-template-columns:200px 1fr;gap:12px;align-items:center}}
+.mlabel{font-size:15px;line-height:1.25}
+.mlabel small{display:block;font-size:12.5px;margin-left:20px}
+.mplot{position:relative;min-height:30px}
+.mgrid{position:absolute;inset:0;pointer-events:none}
+.mgrid i{position:absolute;top:0;bottom:0;width:1px;background:var(--grid)}
+.mbar{position:absolute;left:0;top:5px;height:20px;border-radius:0 4px 4px 0;transition:width .35s ease}
+.mci{position:absolute;top:14px;height:2px;background:var(--ink);opacity:.75}
+.mci:before,.mci:after{content:"";position:absolute;top:-4px;width:2px;height:10px;background:var(--ink)}
+.mci:before{left:0}.mci:after{right:0}
+.mval{position:absolute;top:4px;font-size:14px;font-weight:650;white-space:nowrap;transition:left .35s ease}
+.mna{font-size:13.5px;color:var(--muted);padding:4px 0 2px;line-height:1.35}
+.axis{display:grid;grid-template-columns:1fr;font-size:12px;color:var(--muted)}
+@media (min-width:640px){.axis{grid-template-columns:200px 1fr;gap:12px}}
+.axis .ticks{position:relative;height:18px}
+.axis .ticks span{position:absolute;transform:translateX(-50%)}
+.axis .ticks span:first-child{transform:none}
+.axis .ticks span:last-child{transform:translateX(-100%)}
+details.tview{margin-top:12px}
+details.tview summary{cursor:pointer;color:var(--ink2);font-size:14px;padding:6px 0}
+/* head to head */
+.grid22{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0}
+.cell{border-radius:10px;padding:12px 12px 10px;background:var(--wash);min-height:92px}
+.cell .n{font-size:34px;font-weight:650;line-height:1.05}
+.cell .t{font-size:13.5px;color:var(--ink2);line-height:1.3}
+.cell.hl{outline:2px solid var(--ink)}
+.cell .bar{height:4px;border-radius:2px;margin-top:8px}
+/* per-repo */
+.rbar{display:flex;align-items:center;gap:5px;min-width:0}
+.rbar i{display:block;height:8px;border-radius:0 3px 3px 0;min-width:2px;flex:none}
+#table-repos th,#table-repos td{padding:8px 5px}
+#table-repos td small{display:block;font-size:12px;line-height:1.3;color:var(--muted)}
+.rbar b{font-weight:500;font-variant-numeric:tabular-nums}
+.best b{font-weight:700}
+/* svg charts */
+.chart{width:100%;position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font:12.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:var(--muted)}
+svg .ink{fill:var(--ink)}
+svg .ink2{fill:var(--ink2)}
+.hit:focus{outline:none}
+.hit:focus-visible rect.col,.hit:hover rect.col{filter:brightness(1.12)}
+/* sliders */
+.ctrl{display:grid;grid-template-columns:1fr;gap:2px;margin:12px 0}
+.ctrl label{font-size:14px;color:var(--ink2);display:flex;justify-content:space-between;gap:12px}
+.ctrl output{color:var(--ink);font-weight:650;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--s1);height:32px;margin:0}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.read .tile .v{font-size:28px}
+.neg{color:var(--ink)}
+.verdict{border-radius:10px;padding:12px 14px;background:var(--wash);margin-top:6px;font-size:15px}
+.tip{position:absolute;z-index:50;display:none;background:var(--ink);color:var(--surface);padding:8px 10px;border-radius:8px;font-size:13px;line-height:1.35;max-width:min(300px,86vw);pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.tip strong{display:block;font-size:14px;margin-bottom:2px}
+.example{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--wash);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre}
+.example .ok{font-weight:700}
+@media (min-width:520px){.example{font-size:13.5px}}
+footer{color:var(--ink2);font-size:14px;margin-top:30px}
+.fig{margin:0}
+.fig figcaption{font-size:13.5px;color:var(--ink2);margin-top:8px}
+@media (prefers-reduced-motion: reduce){.mbar,.mval{transition:none}}
+</style>
+</head>
+<body>
+<div class="topbar"><button class="btn" id="theme" type="button" aria-label="Switch colour theme">Theme: auto</button></div>
+<main>
+
+<p class="eyebrow">Experiment report · 14 October 2026 · local-first AI tooling</p>
+<h1>Does a small local decision model help a coding agent choose which file to read?</h1>
+<p class="lede">Can a small AI model running on a Mac mini help a coding agent make decisions? We tested it on real tasks. Results first, method below.</p>
+
+<section id="experiments" aria-label="Experiments">
+  <div class="exp">
+    <div class="exp-h"><span class="num">Experiment 1</span><h2>File search</h2></div>
+    <p class="q">Task + 23 file names. <strong>Which file should the agent open first?</strong></p>
+    <div class="vs" role="img" aria-label="Frontier agent 70 percent, Tev1 28 percent, same 60 tasks">
+      <div class="vrow"><span class="who"><i style="background:var(--s1)"></i>Frontier agent</span><div class="vbar"><b style="width:70%;background:var(--s1)"></b></div><span class="vnum">70%</span></div>
+      <div class="vrow"><span class="who"><i style="background:var(--s2)"></i>Tev1 (local model)</span><div class="vbar"><b style="width:28%;background:var(--s2)"></b></div><span class="vnum">28%</span></div>
+      <div class="vrow dim"><span class="who"><i style="background:var(--base)"></i>Random guess</span><div class="vbar"><b style="width:6%;background:var(--base)"></b></div><span class="vnum">6%</span></div>
+    </div>
+    <p class="read1">% of the 60 tasks where the right file was picked first. Higher is better.</p>
+    <div class="verdict2"><strong>Tev1 lost.</strong> It was never right where the agent was wrong (0 times, vs 25 the other way).</div>
+    <ul class="facts">
+      <li><strong>Also:</strong> on all 216 tasks Tev1 scored 40%, level with a tiny embedding model (38%).</li>
+      <li><strong>Cost:</strong> every check is one extra model request, so it saves no tokens.</li>
+    </ul>
+  </div>
+  <div class="exp off">
+    <div class="exp-h"><span class="num">What this suggests</span><h2>Beyond file search</h2></div>
+    <p class="q"><strong>Tev1 was not good enough here.</strong> Local decision models like it are not yet sufficient to advise a frontier agent.</p>
+    <p class="read1">The same logic may extend to other agent decisions, such as picking MCP tools. That is an inference. Only file search was tested, and only Tev1.</p>
+  </div>
+  <div class="scope2">
+    <div><span class="tag2">Shows</span> Tev1, a small local model, advising a frontier agent on file search, did not help.</div>
+    <div><span class="tag2 no">Does not show</span> That every decision model fails. Jev, fine-tuning, other local models and other tasks were not tested.</div>
+  </div>
+</section>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#experiments">Experiments</a><a href="#method">Method</a><a href="#results">Results</a><a href="#head-to-head">Head-to-head</a><a href="#calibration">Confidence</a><a href="#policy">Policy test</a><a href="#tokens">Token cost</a><a href="#why">Why it fell short</a><a href="#limits">Limits</a><a href="#repro">Reproducibility</a>
+</nav>
+
+<section id="method" class="card">
+  <h2>What was tested</h2>
+  <p><strong>The idea under test.</strong> "Decision models" take a piece of state, a question and a lettered list of options, and return one choice with probabilities in a single forward pass, with no text generation. The pitch is that an agent loop can hand its small bounded decisions (which file to read, which tool to call) to a cheap local model and save frontier-model tokens. We tested the most direct version: let a local model rank the candidate files and compare with what the frontier agent would have chosen on its own.</p>
+  <p><strong>Hypothesis.</strong> Consulting the local model lowers token cost <em>without</em> lowering accuracy. Both halves must hold. If accuracy drops, or the consult costs more than it saves, the idea fails.</p>
+
+  <h3>How a task is built</h3>
+  <p>Cases come from real git history, so the correct answer is known without anyone labelling it. For each commit: the <strong>task</strong> is the commit subject; the <strong>candidates</strong> are up to 23 files found by keyword search in the parent commit (what an agent gets from <code>rg -l</code>); the <strong>answer</strong> is the file(s) the commit actually changed.</p>
+<div class="example" role="img" aria-label="Illustrative example of one evaluation case"><span class="muted">Invented example, not from the data</span>
+task: "Handle empty cursor in
+       the pagination helper"
+candidates (alphabetical):
+   docs/api.md
+   src/api/orders.ts
+   src/api/pagination.test.ts
+<span class="ok"> ✔ src/api/pagination.ts</span>
+   src/components/Table.tsx
+   src/lib/cursor.ts
+   … up to 23 files
+✔ = changed by the commit (the answer)</div>
+  <p class="muted" style="font-size:14px">Filters: the subject must not contain a changed file's name; at least one answer must be in the candidate list; 1–3 changed files; ≥4 candidates; binaries/lockfiles excluded. Up to 50 cases per repository; 216 in total; median 23 candidates and 1 correct file per case, so random chance is about 6%.</p>
+
+  <h3>Five methods, identical inputs</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Method</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><span class="key" style="background:var(--base)"></span>Random</td><td>Chance baseline (closed-form expectation).</td></tr>
+      <tr><td><span class="key" style="background:var(--s4)"></span>Keyword count</td><td>Ranks candidates by how many of the task's keywords appear in the file; ties broken randomly (300 draws averaged).</td></tr>
+      <tr><td><span class="key" style="background:var(--s3)"></span>Embedding model</td><td><code>embeddinggemma</code> 300M: cosine similarity between the task text and each file path.</td></tr>
+      <tr><td><span class="key" style="background:var(--s2)"></span>Tev1 4B</td><td>The decision model, as it would be deployed: task in the question, bare file paths as lettered options, plus an automatically added "unsure" option. Ranked by its option probabilities. A second prompt variant (task in the state field) scored the same (p = 0.79).</td></tr>
+      <tr><td><span class="key" style="background:var(--s1)"></span>Frontier agent</td><td>Claude Opus&nbsp;5.5 shown the task and the numbered path list (alphabetical, no ranking hints), no repository access, picking one file. Picks were written to disk <em>before</em> scoring. 60 randomly sampled cases.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Control variables</h3>
+  <div class="tablewrap"><table>
+    <tbody>
+      <tr><th>Same inputs</th><td>Every method received the same task text and the same candidate list for each case. Tev1 and the agent saw only file names, never file contents.</td></tr>
+      <tr><th>Ground truth</th><td>Fixed from git before any model ran; not edited afterwards.</td></tr>
+      <tr><th>Determinism</th><td>Tev1 ran at temperature 0 (its shipped default); the embedding model is deterministic. One run per case; no cherry-picked reruns.</td></tr>
+      <tr><th>Agent sample</th><td>60 of 216 cases drawn at random with a fixed seed. The agent sheet listed candidates alphabetically and omitted answers and rankings.</td></tr>
+      <tr><th>"Unsure" option</th><td>Added to every Tev1 question as a way to abstain; excluded when scoring, so it can only cost Tev1 probability mass, not credit.</td></tr>
+      <tr><th>Tuning</th><td>None. No prompt search, no fine-tuning, no threshold tuned on the test data.</td></tr>
+      <tr><th>Hardware</th><td>Apple M4 Mac mini, 16 GiB; Ollama 0.40.3; runs serialised under a shared inference lease, models unloaded after each group of 10 cases.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted" style="font-size:14px"><strong>Metrics.</strong> Top‑1: the first‑ranked file is one the commit changed. Top‑3: any of the first three is. Intervals are 95% Wilson; paired comparisons use an exact sign (McNemar) test on discordant cases.</p>
+</section>
+
+<section id="results" class="card">
+  <h2>Results: how often the right file came first</h2>
+  <div class="filters">
+    <div><span class="flabel">Metric</span><div class="seg" id="seg-metric" role="group" aria-label="Metric">
+      <button type="button" data-v="top1" aria-pressed="true">Right file first</button><button type="button" data-v="top3" aria-pressed="false">Right file in top 3</button></div></div>
+    <div><span class="flabel">Cases</span><div class="seg" id="seg-set" role="group" aria-label="Cases">
+      <button type="button" data-v="all" aria-pressed="true">All 216</button><button type="button" data-v="sub" aria-pressed="false">Blind agent sample (60)</button></div></div>
+  </div>
+  <div id="chart-methods" role="group" aria-label="Accuracy by method"></div>
+  <div class="axis"><span></span><div class="ticks"><span style="left:0">0%</span><span style="left:25%">25%</span><span style="left:50%">50%</span><span style="left:75%">75%</span><span style="left:100%">100%</span></div></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Bars show accuracy; the whisker is the 95% confidence interval. Tap or hover a row for the counts.</p>
+  <details class="tview"><summary>Table view</summary><div class="tablewrap" id="table-methods"></div></details>
+  <h3>Per repository</h3>
+  <p class="muted">Each repository is small (22–50 cases), so single numbers swing by ±12 points or more. Treat this as texture, not a ranking. Repository names are withheld.</p>
+  <div class="tablewrap"><table id="table-repos"></table></div>
+  <p id="repo-note" class="muted" style="font-size:14px"></p>
+</section>
+
+<section id="head-to-head" class="card">
+  <h2>Head-to-head: who was right when they disagreed?</h2>
+  <div class="filters"><div class="seg" id="seg-pair" role="group" aria-label="Comparison">
+    <button type="button" data-v="agent" aria-pressed="true">Agent vs Tev1 (60 cases)</button><button type="button" data-v="embed" aria-pressed="false">Tev1 vs embedding (216)</button></div></div>
+  <div id="pair"></div>
+</section>
+
+<section id="calibration" class="card">
+  <h2>Does Tev1's confidence mean anything?</h2>
+  <p>If a model says 90% on a pick, that pick should be right about 90% of the time. For each case the model's probability for its top real option is binned below; the tick marks where perfectly calibrated confidence would land.</p>
+  <figure class="fig"><div id="chart-calib" class="chart"></div>
+  <figcaption>Observed accuracy by stated probability (all 216 cases). The number under each column is how many cases fell in the bin.</figcaption></figure>
+  <div class="tablewrap" style="margin-top:12px"><table id="table-labels"></table></div>
+  <p class="muted" style="font-size:14px">In 41% of cases the single most likely answer was the added "unsure" option. The Tev1 authors themselves caution that its probabilities are model preferences rather than calibrated confidence; this is what that looks like on a real task. The relationship is not even monotonic: the 50–75% bin was right less often than the 25–50% bin.</p>
+</section>
+
+<section id="policy" class="card">
+  <h2>Can confidence-gating rescue it?</h2>
+  <p>The natural fix is to trust Tev1 only when it is confident and otherwise use the agent's own pick. On the 60 blind cases, drag the threshold: above it, take Tev1's answer; below it, keep the agent's.</p>
+  <div class="ctrl"><label for="thr">Follow Tev1 when its top probability is at least <output id="thr-out">0.80</output></label><input id="thr" type="range" min="0" max="100" value="80" step="1"></div>
+  <div id="chart-policy" class="chart"></div>
+  <div class="read" id="policy-read"></div>
+  <p class="muted" style="font-size:14px">No threshold produced an accuracy above the agent alone (best achievable: 70.0%, which is simply "never follow Tev1"). Where Tev1 was most confident the agent was already right: the confident cases are the easy ones. n = 60, so small differences are noise; the direction is what matters.</p>
+</section>
+
+<section id="tokens" class="card">
+  <h2>What a consult costs</h2>
+  <p>Accuracy is half the hypothesis. The other half is cost, and here the structure of an agent loop matters more than the model:</p>
+  <div class="tiles">
+    <div class="tile"><span class="l">Context re-read per request</span><div class="v">261k</div><div class="s">median tokens, 1,699 requests in 16 real Claude Code sessions (p25 136k · p75 425k)</div></div>
+    <div class="tile"><span class="l">Median file read</span><div class="v">~600</div><div class="s">tokens added to context (p75 ~1,350; 242 reads)</div></div>
+    <div class="tile"><span class="l">The whole candidate list</span><div class="v">~280</div><div class="s">tokens (median 837 bytes of paths) — there is little to compress</div></div>
+    <div class="tile"><span class="l">One consult, warm</span><div class="v">2.9s</div><div class="s">median latency; p95 7.6s</div></div>
+  </div>
+  <p><strong>The mechanism.</strong> A tool call cannot be free: the agent must emit the call, wait for the result, and take another model request to act on it. Each request re-reads the whole (cached) conversation. A consult therefore costs about one extra request, however cheap the local model is. A wrong file read costs that file's tokens plus, usually, one recovery request. So a consult only pays if it prevents more than one wrong read, on average, per use.</p>
+  <h3>Try the numbers <span class="tag">modelled, not measured</span></h3>
+  <p class="muted" style="font-size:14px">Assumptions are on screen; change them. Costs are in "token-equivalents" at cached-input price. This is a model of the loop, not a bill.</p>
+  <div class="filters"><div><span class="flabel">Advisor accuracy</span><div class="seg" id="seg-adv" role="group" aria-label="Advisor accuracy">
+    <button type="button" data-v="1" aria-pressed="true">Perfect advisor (100%)</button><button type="button" data-v="0.667" aria-pressed="false">Tev1 gated (67%)</button><button type="button" data-v="0.283" aria-pressed="false">Tev1 alone (28%)</button></div></div></div>
+  <div class="ctrl"><label for="k-ctx">Context re-read per request <output id="o-ctx"></output></label><input id="k-ctx" type="range" min="0" max="1000" value="895"></div>
+  <div class="ctrl"><label for="k-acc">Agent's own accuracy <output id="o-acc"></output></label><input id="k-acc" type="range" min="20" max="95" value="70"></div>
+  <div class="ctrl"><label for="k-r">Cached price as share of full input price <output id="o-r"></output></label><input id="k-r" type="range" min="1" max="100" value="10"></div>
+  <div class="ctrl"><label for="k-R">Requests left in the session, so a bad read lingers <output id="o-R"></output></label><input id="k-R" type="range" min="1" max="60" value="20"></div>
+  <div class="read" id="tok-read"></div>
+  <div class="verdict" id="tok-verdict"></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Model: consult = 150 new tokens + one request. Wrong read = file tokens (606, and they persist) + one recovery request. Expected wrong reads before a right one = (1 − accuracy) ÷ accuracy. A perfect advisor can only pay off in loops with small contexts; a weak one cannot.</p>
+</section>
+
+<section id="why" class="card">
+  <h2>Why it fell short</h2>
+  <p>Each explanation is tagged with how well this test supports it.</p>
+  <ol>
+    <li><strong>The task is outside what it was trained on.</strong> <span class="tag">partly measured</span> Tev1 was fine-tuned on 37,840 examples of NLI, yes/no questions, banking intents, news topics, sentiment, rule-based policies, routing and research-paper categories. None resemble "which file implements this change". That a 300M embedding model matched it (26 vs 22 discordant cases, p = 0.67) suggests it added little beyond text similarity between task and path.</li>
+    <li><strong>Equal information, unequal judgement.</strong> <span class="tag">inferred</span> The agent also saw only file names, so the gap is not about access. The agent knows conventions (tests sit beside code, docs rarely change for a bug fix, a template goes with its route); a 4B model on bare paths mostly does not. This test cannot separate which of those matters most.</li>
+    <li><strong>Probability is not confidence.</strong> <span class="tag">measured</span> Accuracy was 25%, 44%, 35%, 47% and 71% across rising probability bins. Even its "STRONG" label (clear leader) was right only 61% of the time; on the 8 such cases inside the agent sample, Tev1 was right 4 times and the agent 6.</li>
+    <li><strong>Where it is sure, the agent was already right.</strong> <span class="tag">measured</span> Gating by confidence selects the easy cases, which the agent does not need help with.</li>
+    <li><strong>Consults are expensive in this loop shape.</strong> <span class="tag">modelled</span> A consult is one more request over a very large context (see the calculator).</li>
+    <li><strong>Untuned input.</strong> <span class="tag">untested</span> Options were bare paths. One-line descriptions of each file, or fine-tuning on the agent's own past choices, may help. Vendors report large gains from domain fine-tuning; we did not test it.</li>
+  </ol>
+  <p><strong>It was not uniformly bad.</strong> Tev1 was best on two repositories (an iOS app: 64% vs 46% embedding; a Python analytics engine: 48% vs 42%), tied on one, and worst on a video-template repository (14% vs 36% keyword). That spread is a reason to evaluate on your own code before trusting any benchmark, including this one.</p>
+</section>
+
+<section id="limits" class="card">
+  <h2>Threats to validity</h2>
+  <ul>
+    <li><strong>One agent, one annotator, n = 60.</strong> The "agent" baseline is a single model's single pass, made by the same assistant that built the cases, so it knew the answer is always among the candidates. Picks were frozen before scoring and no answers or rankings were on the sheet, but an independent replication (any other agent on the same sheet) is the right check.</li>
+    <li><strong>The 60-case sample was harder for Tev1 than the rest.</strong> Tev1 scored 28% (CI 19–41) on it and 45% (CI 37–53) on the other 156 cases, so the 70 vs 28 gap may be somewhat exaggerated. Using Tev1's 40% over all 216 the gap is still ~30 points (Tev1 CI 34–47 vs agent CI 58–80), but the paired test is only valid on the 60.</li>
+    <li><strong>Strict ground truth.</strong> Only files the commit changed count. Opening a neighbour first is not necessarily a mistake, so absolute accuracies are low for every method; the comparison is relative.</li>
+    <li><strong>Answers are always in the list.</strong> By construction, which flatters every method relative to real life, where the right file may not be among the candidates.</li>
+    <li><strong>Task text is commit subjects:</strong> terse and written after the fact. Real tasks are phrased differently.</li>
+    <li><strong>Five repositories by one developer</strong> in different languages; small, with idiosyncratic naming.</li>
+    <li><strong>Token economics come from one user's sessions</strong>, estimated from usage counters (not billed cost); the cached-price ratio is an assumption.</li>
+    <li><strong>One model version.</strong> Tev1 is labelled experimental; newer or larger decision models may behave differently.</li>
+    <li><strong>Anchoring not measured.</strong> A blind-sampling harness was built to measure how advice influences the agent, but no field data had accumulated.</li>
+  </ul>
+  <h3>Not tested, and worth testing</h3>
+  <ul>
+    <li><strong>Jev</strong> (TypeSafe's hosted model, 64k context). Ollama's launch coverage reports a mean-accuracy gap of only about 3 points between Jev and Tev1 on a 13-dataset classification suite, so this task mismatch probably is not closed by Jev alone, but that is an inference, not a result.</li>
+    <li><strong>Other local models</strong> (Nimble 9B, Laya 421M; Clef‑Flash does not fit this machine's RAM) and <strong>fine-tuning on the agent's own decisions</strong>.</li>
+    <li><strong>Richer options</strong> (a one-line description per file) and <strong>small-context loops</strong>, where a consult is cheap.</li>
+    <li><strong>The use case decision models were built for</strong>: high-volume classification and routing with no frontier model in the loop.</li>
+  </ul>
+</section>
+
+<section id="repro" class="card">
+  <h2>Reproducibility</h2>
+  <div class="tablewrap"><table><tbody>
+    <tr><th>Decision model</th><td><code>tev1:4b-nvfp4</code> (Together AI; Qwen3.5-4B fine-tune; MLX NVFP4; digest 1b15f25c…), run as a local variant with <code>num_ctx 32768</code> (prompts here were ~700 tokens, so unaffected)</td></tr>
+    <tr><th>Endpoint</th><td>Ollama 0.40.3 <code>/v1/systemone</code>, <code>choice</code> questions only</td></tr>
+    <tr><th>Embedding baseline</th><td><code>embeddinggemma:300m</code> (digest 5265a4c1…), cosine similarity</td></tr>
+    <tr><th>Agent baseline</th><td>Claude Opus 5.5, single pass over a 60-case sheet</td></tr>
+    <tr><th>Seeds</th><td>Case sampling: 13 · keyword tie-breaks: 0</td></tr>
+    <tr><th>Dates</th><td>Run 13–14 October 2026</td></tr>
+    <tr><th>Code</th><td>Three small stdlib-Python scripts: case builder, runner, scorer. Not yet published.</td></tr>
+  </tbody></table></div>
+  <h3>Sources for outside claims</h3>
+  <ul>
+    <li><a href="https://github.com/togethercomputer/tev1">Tev1 repository</a> (training mix, 2–24 options, "not calibrated confidence", dev benchmarks reused)</li>
+    <li><a href="https://www.together.ai/blog/how-to-train-your-own-jev">Together AI: how to train your own Jev</a> (dataset composition, $17 fine-tune)</li>
+    <li><a href="https://ollama.com/blog/ollama-now-supports-jev-style-decision-models">Ollama: decision models</a> (the endpoint and the 13-dataset comparison)</li>
+    <li><a href="https://www.deeplearning.ai/the-batch/models-built-to-do-one-thing-well">The Batch: Jev and imitators</a></li>
+    <li><a href="https://arxiv.org/abs/2606.07587">The Routing Plateau</a> and <a href="https://arxiv.org/abs/2601.07206">LLMRouterBench</a> (simple embedding baselines match learned routers)</li>
+    <li><a href="https://cognition.com/blog/swe-grep">Cognition: SWE-grep</a> (retrieval as a trained subagent)</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Prepared with Claude (Anthropic) at the request of the repository owner. The agent baseline was Claude Opus 5.5; analysis and write-up by Claude Sonnet 5.5. Repository names, file paths and commit messages are withheld; the figures above are aggregates. Colours follow a CVD-checked categorical palette; every chart has a table view.</p>
+</footer>
+</main>
+
+<script>
+const D = {"methods":{"random":{"top1":[6.0,3.6,10.0],"top3":[18.1,13.5,23.7],"sub_top1":[6.7,2.6,15.9],"sub_top3":[18.3,10.6,29.9]},"keyword":{"top1":[25.9,20.5,32.2],"top3":[50.9,44.3,57.5],"sub_top1":[26.7,17.1,39.0],"sub_top3":[48.3,36.2,60.7]},"embed":{"top1":[38.4,32.2,45.1],"top3":[63.0,56.3,69.1],"sub_top1":[33.3,22.7,45.9],"sub_top3":[56.7,44.1,68.4]},"tevA":{"top1":[40.3,34.0,46.9],"top3":[62.0,55.4,68.2],"sub_top1":[28.3,18.5,40.8],"sub_top3":[55.0,42.5,66.9]},"tevB":{"top1":[39.4,33.1,46.0],"top3":[63.0,56.3,69.1],"sub_top1":[25.0,15.8,37.2],"sub_top3":[56.7,44.1,68.4]},"agent":{"sub_top1":[70.0,57.5,80.1]}},"repos":{"Video templates (TypeScript, Remotion)":{"n":22,"random":5.7,"keyword":36.4,"embed":27.3,"tevA":13.6,"tevB":13.6,"cands":23},"iOS app (Swift)":{"n":44,"random":7.0,"keyword":42.7,"embed":45.5,"tevA":63.6,"tevB":63.6,"cands":23},"Browser/3D game (TypeScript, Godot)":{"n":50,"random":5.3,"keyword":18.4,"embed":44.0,"tevA":36.0,"tevB":38.0,"cands":23},"Infra monorepo (Python, Docker, workflow engine)":{"n":50,"random":5.9,"keyword":24.4,"embed":28.0,"tevA":28.0,"tevB":28.0,"cands":23},"Quant analytics engine (Python)":{"n":50,"random":7.0,"keyword":16.7,"embed":42.0,"tevA":48.0,"tevB":42.0,"cands":23}},"paired_all":{"tevA_vs_embed":{"both":61,"only_first":26,"only_second":22,"neither":107,"p":0.6654658120766186},"tevA_vs_tevB":{"both":79,"only_first":8,"only_second":6,"neither":123,"p":0.79052734375}},"paired_sub":{"agent_vs_tevA":{"both":17,"only_first":25,"only_second":0,"neither":18,"p":5.960464477539063e-08},"agent_vs_embed":{"both":18,"only_first":24,"only_second":2,"neither":16,"p":1.049041748046875e-05}},"subsample_effect":{"tevA_sub":[28.3,18.5,40.8],"tevA_rest":[44.9,37.3,52.7],"embed_sub":[33.3,22.7,45.9],"embed_rest":[40.4,33.0,48.2]},"labels":{"STRONG":{"n":41,"acc":[61.0,45.7,74.3]},"WEAK":{"n":87,"acc":[39.1,29.5,49.6]},"UNSURE":{"n":88,"acc":[31.8,23.0,42.1]}},"meta":{"n_cases":216,"n_sub":60,"cands_median":23,"cands_min":6,"cands_max":23,"truth_median":1,"list_bytes_median":837,"ms_A_p50":2905,"ms_A_p95":7626,"ms_B_p50":2992,"tev_unsure_top_share":40.7},"reliability_rows":[[0.437,0],[0.884,1],[0.122,0],[0.582,0],[0.292,0],[0.655,1],[0.508,0],[0.212,1],[0.277,0],[0.302,1],[0.768,0],[0.233,0],[0.088,0],[0.23,0],[0.264,0],[0.944,0],[0.228,0],[0.172,0],[0.267,1],[0.539,0],[0.145,0],[0.283,0],[0.397,0],[0.527,1],[0.069,0],[0.187,0],[0.971,1],[0.383,0],[0.715,0],[0.354,1],[0.981,1],[0.947,0],[0.263,0],[0.525,0],[0.997,0],[0.968,0],[0.618,0],[0.934,1],[0.411,1],[0.804,0],[0.388,1],[0.205,0],[0.741,1],[0.665,0],[0.956,1],[0.821,0],[0.25,0],[0.121,0],[0.62,0],[0.717,0],[0.972,1],[0.264,0],[0.283,0],[0.436,0],[0.345,1],[0.525,0],[0.484,0],[0.549,1],[0.251,1],[0.067,0],[0.354,0],[0.585,1],[0.069,0],[0.293,1],[0.598,0],[0.981,1],[0.29,0],[0.619,0],[0.123,0],[0.247,0],[0.781,0],[0.281,1],[0.889,0],[0.613,0],[0.284,0],[0.172,0],[0.352,0],[0.991,1],[0.23,0],[0.872,0],[0.462,0],[0.252,0],[0.224,1],[0.805,1],[0.464,0],[0.752,1],[0.425,1],[0.594,0],[0.455,0],[0.38,1],[0.987,1],[0.081,0],[0.648,0],[0.159,1],[0.971,1],[0.541,0],[0.272,0],[0.981,1],[0.246,0],[0.478,0],[0.973,1],[0.348,0],[0.494,1],[0.985,1],[0.369,1],[0.421,1],[0.192,0],[0.492,0],[0.866,0],[0.321,0],[0.192,1],[0.403,1],[0.38,1],[0.351,1],[0.564,0],[0.997,1],[0.865,1],[0.965,1],[0.036,0],[0.03,0],[0.681,0],[0.523,0],[0.674,0],[0.412,0],[0.184,0],[0.592,0],[0.607,1],[0.668,0],[0.829,1],[0.69,1],[0.264,1],[0.073,1],[0.062,1],[0.68,1],[0.919,0],[0.7,0],[0.376,0],[0.726,1],[0.86,1],[0.032,0],[0.019,0],[0.561,0],[0.33,1],[0.214,0],[0.299,0],[0.07,0],[0.361,0],[0.082,1],[0.911,1],[0.429,0],[0.644,1],[0.112,1],[0.294,1],[0.26,0],[0.27,0],[0.161,0],[0.166,0],[0.822,0],[0.499,1],[0.325,1],[0.434,1],[0.599,0],[0.657,1],[0.739,0],[0.687,1],[0.427,0],[0.235,0],[0.29,0],[0.722,1],[0.421,1],[0.751,1],[0.824,1],[0.238,1],[0.628,1],[0.544,1],[0.506,1],[0.631,0],[0.422,1],[0.749,1],[0.946,1],[0.151,0],[0.157,1],[0.279,0],[0.248,1],[0.677,1],[0.164,1],[0.485,0],[0.423,1],[0.348,1],[0.62,1],[0.305,1],[0.586,0],[0.999,1],[0.244,0],[0.162,0],[0.563,0],[0.545,0],[0.105,0],[0.654,0],[0.96,0],[0.993,0],[0.736,0],[0.251,0],[0.569,0],[0.716,0],[0.092,0],[0.761,0],[0.144,1],[0.509,0],[0.465,1],[0.127,0],[0.245,0],[0.351,1],[0.133,0],[0.243,0],[0.132,0]],"policy_rows":[{"p":0.437,"unsure":0.386,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.122,"unsure":0.621,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.508,"unsure":0.069,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.944,"unsure":0.047,"tev_ok":0,"agent_ok":1,"same":0,"label":"STRONG"},{"p":0.172,"unsure":0.529,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.539,"unsure":0.255,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.145,"unsure":0.448,"tev_ok":0,"agent_ok":0,"same":0,"label":"UNSURE"},{"p":0.397,"unsure":0.309,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.715,"unsure":0.205,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.947,"unsure":0.009,"tev_ok":0,"agent_ok":0,"same":0,"label":"STRONG"},{"p":0.263,"unsure":0.491,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.934,"unsure":0.036,"tev_ok":1,"agent_ok":1,"same":1,"label":"STRONG"},{"p":0.283,"unsure":0.194,"tev_ok":0,"agent_ok":0,"same":0,"label":"WEAK"},{"p":0.436,"unsure":0.206,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.525,"unsure":0.463,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.598,"unsure":0.32,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.281,"unsure":0.595,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.172,"unsure":0.53,"tev_ok":0,"agent_ok":0,"same":0,"label":"UNSURE"},{"p":0.352,"unsure":0.275,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.805,"unsure":0.18,"tev_ok":1,"agent_ok":1,"same":1,"label":"STRONG"},{"p":0.425,"unsure":0.138,"tev_ok":1,"agent_ok":1,"same":1,"label":"WEAK"},{"p":0.081,"unsure":0.767,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.272,"unsure":0.575,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.981,"unsure":0.016,"tev_ok":1,"agent_ok":1,"same":1,"label":"STRONG"},{"p":0.478,"unsure":0.226,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.421,"unsure":0.199,"tev_ok":1,"agent_ok":1,"same":1,"label":"WEAK"},{"p":0.192,"unsure":0.317,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.192,"unsure":0.668,"tev_ok":1,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.351,"unsure":0.31,"tev_ok":1,"agent_ok":1,"same":1,"label":"WEAK"},{"p":0.564,"unsure":0.235,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.036,"unsure":0.933,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.674,"unsure":0.318,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.412,"unsure":0.25,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.668,"unsure":0.246,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.264,"unsure":0.492,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.073,"unsure":0.891,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.919,"unsure":0.052,"tev_ok":0,"agent_ok":1,"same":0,"label":"STRONG"},{"p":0.7,"unsure":0.074,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.376,"unsure":0.547,"tev_ok":0,"agent_ok":0,"same":0,"label":"UNSURE"},{"p":0.561,"unsure":0.086,"tev_ok":0,"agent_ok":0,"same":1,"label":"WEAK"},{"p":0.214,"unsure":0.66,"tev_ok":0,"agent_ok":0,"same":1,"label":"UNSURE"},{"p":0.299,"unsure":0.632,"tev_ok":0,"agent_ok":0,"same":0,"label":"UNSURE"},{"p":0.361,"unsure":0.464,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.082,"unsure":0.773,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.911,"unsure":0.085,"tev_ok":1,"agent_ok":1,"same":1,"label":"STRONG"},{"p":0.166,"unsure":0.742,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.599,"unsure":0.22,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.238,"unsure":0.646,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.506,"unsure":0.042,"tev_ok":1,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.279,"unsure":0.522,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.164,"unsure":0.649,"tev_ok":1,"agent_ok":1,"same":1,"label":"UNSURE"},{"p":0.348,"unsure":0.348,"tev_ok":1,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.586,"unsure":0.244,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.244,"unsure":0.663,"tev_ok":0,"agent_ok":1,"same":0,"label":"UNSURE"},{"p":0.654,"unsure":0.088,"tev_ok":0,"agent_ok":0,"same":0,"label":"WEAK"},{"p":0.736,"unsure":0.211,"tev_ok":0,"agent_ok":1,"same":0,"label":"WEAK"},{"p":0.251,"unsure":0.532,"tev_ok":0,"agent_ok":0,"same":0,"label":"UNSURE"},{"p":0.761,"unsure":0.062,"tev_ok":0,"agent_ok":0,"same":0,"label":"STRONG"},{"p":0.509,"unsure":0.397,"tev_ok":0,"agent_ok":0,"same":0,"label":"WEAK"},{"p":0.351,"unsure":0.188,"tev_ok":1,"agent_ok":1,"same":1,"label":"WEAK"}]};
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+function h(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') n.className = v; else n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) { if (kid == null) continue; n.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+  return n;
+}
+const NS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs, ...kids) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v);
+  for (const kid of kids.flat()) { if (kid == null) continue; n.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+  return n;
+}
+const R0 = x => Math.round(x);
+const fmtP = p => p < 0.0001 ? 'p < 0.0001' : 'p = ' + (p < 0.01 ? p.toFixed(4) : p.toFixed(2));
+
+/* ---------- tooltip (enhances; every value is also in a table view) ---------- */
+const tip = h('div', { class: 'tip', role: 'status' });
+document.body.append(tip);
+function showTip(target, title, lines) {
+  tip.replaceChildren(h('strong', {}, title), ...lines.map(l => h('div', {}, l)));
+  tip.style.display = 'block';
+  const r = target.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  let x = r.left + r.width / 2 - tw / 2; x = Math.max(8, Math.min(innerWidth - tw - 8, x));
+  let y = r.top - th - 8; if (y < 8) y = r.bottom + 8;
+  tip.style.left = (x + scrollX) + 'px'; tip.style.top = (y + scrollY) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+function attachTip(node, title, lines) {
+  node.setAttribute('tabindex', '0'); node.dataset.tip = '1';
+  const show = () => showTip(node, title, lines);
+  node.addEventListener('pointerenter', show); node.addEventListener('focus', show);
+  node.addEventListener('pointerleave', hideTip); node.addEventListener('blur', hideTip);
+  node.addEventListener('click', show);
+}
+document.addEventListener('click', e => { if (!e.target.closest('[data-tip]')) hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
+
+/* ---------- theme ---------- */
+(function () {
+  const btn = $('#theme'); const modes = ['auto', 'light', 'dark']; let i = 0;
+  btn.addEventListener('click', () => {
+    i = (i + 1) % 3; const m = modes[i];
+    if (m === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', m);
+    btn.textContent = 'Theme: ' + m;
+  });
+})();
+
+/* ---------- segmented controls ---------- */
+function seg(id, onChange) {
+  const root = $(id);
+  root.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $$('button', root).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    onChange(b.dataset.v);
+  });
+}
+
+/* ---------- methods chart ---------- */
+const METHODS = [
+  { k: 'random', name: 'Random guess', note: 'chance', c: 'var(--base)' },
+  { k: 'keyword', name: 'Keyword count', note: 'task words found in the file', c: 'var(--s4)' },
+  { k: 'embed', name: 'Embedding model', note: 'embeddinggemma 300M', c: 'var(--s3)' },
+  { k: 'tevA', name: 'Tev1 4B', note: 'local decision model', c: 'var(--s2)' },
+  { k: 'agent', name: 'Frontier agent', note: 'Claude Opus 5.5, blind pick', c: 'var(--s1)' },
+];
+const st = { metric: 'top1', set: 'all' };
+function methodValue(m) {
+  const M = D.methods[m.k]; if (!M) return null;
+  return st.set === 'all' ? (M[st.metric] || null) : (M['sub_' + st.metric] || null);
+}
+function renderMethods() {
+  const n = st.set === 'all' ? D.meta.n_cases : D.meta.n_sub;
+  const root = $('#chart-methods'); root.replaceChildren();
+  const tb = h('tbody');
+  for (const m of METHODS) {
+    const v = methodValue(m);
+    const label = h('div', { class: 'mlabel' }, h('span', { class: 'key', style: 'background:' + m.c }), m.name, h('small', {}, m.note));
+    const plot = h('div', { class: 'mplot' });
+    const grid = h('div', { class: 'mgrid' }); [0, 25, 50, 75, 100].forEach(g => grid.append(h('i', { style: 'left:' + g + '%' })));
+    plot.append(grid);
+    const row = h('div', { class: 'mrow' }, label, plot);
+    if (v) {
+      const [p, lo, hi] = v;
+      plot.append(h('div', { class: 'mbar', style: `width:${p}%;background:${m.c}` }),
+                  h('div', { class: 'mci', style: `left:${lo}%;width:${Math.max(hi - lo, 0.3)}%` }),
+                  h('span', { class: 'mval', style: `left:calc(${hi}% + 8px)` }, R0(p) + '%'));
+      const k = R0(p * n / 100);
+      attachTip(row, m.name, [`${R0(p)}% right (${k} of ${n})`, `95% interval ${R0(lo)}–${R0(hi)}%`]);
+      tb.append(h('tr', {}, h('td', {}, m.name), h('td', { class: 'num' }, R0(p) + '%'), h('td', { class: 'num' }, `${R0(lo)}–${R0(hi)}%`), h('td', { class: 'num' }, `${k} / ${n}`)));
+    } else {
+      const why = m.k === 'agent' ? (st.set === 'all' ? 'Not run on all 216 cases (blind picks were made on a 60-case sample)' : 'Made a single pick per case, so no top‑3') : 'n/a';
+      plot.append(h('div', { class: 'mna' }, why));
+      tb.append(h('tr', {}, h('td', {}, m.name), h('td', { colspan: '3' }, why)));
+    }
+    root.append(row);
+  }
+  $('#table-methods').replaceChildren(h('table', {}, h('thead', {}, h('tr', {}, h('th', {}, 'Method'), h('th', { class: 'num' }, 'Accuracy'), h('th', { class: 'num' }, '95% interval'), h('th', { class: 'num' }, 'Correct'))), tb));
+}
+seg('#seg-metric', v => { st.metric = v; renderMethods(); });
+seg('#seg-set', v => { st.set = v; renderMethods(); });
+
+/* ---------- per repo ---------- */
+function renderRepos() {
+  const cols = [['keyword', 'Keyword', 'var(--s4)'], ['embed', 'Embed', 'var(--s3)'], ['tevA', 'Tev1', 'var(--s2)']];
+  const t = $('#table-repos');
+  t.replaceChildren(h('thead', {}, h('tr', {}, h('th', {}, 'Repository'), h('th', { class: 'num' }, 'n'), ...cols.map(c => h('th', {}, c[1])))));
+  const tb = h('tbody'); let wins = 0, ties = 0, losses = 0;
+  for (const [name, r] of Object.entries(D.repos)) {
+    const best = Math.max(...cols.map(c => r[c[0]]));
+    const tevBest = r.tevA >= best - 0.05, tevTop = cols.filter(c => c[0] !== 'tevA').every(c => r.tevA > r[c[0]]);
+    if (tevTop) wins++; else if (tevBest) ties++; else losses++;
+    const [short, stack] = name.split(' (');
+    tb.append(h('tr', {}, h('td', {}, short, h('small', {}, stack ? stack.replace(')', '') : '')), h('td', { class: 'num' }, r.n),
+      ...cols.map(c => h('td', { class: r[c[0]] >= best - 0.05 ? 'best' : '' },
+        h('div', { class: 'rbar' }, h('i', { style: `width:${Math.round(r[c[0]] * 0.4)}px;background:${c[2]}` }), h('b', {}, R0(r[c[0]]) + '%'))))));
+  }
+  t.append(tb);
+  const best = Object.entries(D.repos).filter(([, r]) => r.tevA > Math.max(r.keyword, r.embed)).length;
+  const worst = Object.entries(D.repos).filter(([, r]) => r.tevA < Math.min(r.keyword, r.embed)).length;
+  $('#repo-note').textContent = `Tev1 had the highest score on ${best} of ${Object.keys(D.repos).length} repositories and the lowest on ${worst}. Bold marks the best method in each row. Top‑1 accuracy.`;
+}
+
+/* ---------- head to head ---------- */
+function renderPair(which) {
+  const agent = which === 'agent';
+  const P = agent ? D.paired_sub.agent_vs_tevA : D.paired_all.tevA_vs_embed;
+  const A = agent ? 'Agent' : 'Tev1', B = agent ? 'Tev1' : 'Embedding';
+  const total = P.both + P.only_first + P.only_second + P.neither;
+  const cell = (n, text, color, hl) => h('div', { class: 'cell' + (hl ? ' hl' : '') }, h('div', { class: 'n' }, n), h('div', { class: 't' }, text),
+    h('div', { class: 'bar', style: `width:${Math.max(4, n / total * 100)}%;background:${color}` }));
+  const root = $('#pair'); root.replaceChildren(
+    h('div', { class: 'grid22' },
+      cell(P.both, 'both right', 'var(--muted)', false),
+      cell(P.only_first, `only ${A} right`, agent ? 'var(--s1)' : 'var(--s2)', agent),
+      cell(P.only_second, `only ${B} right`, agent ? 'var(--s2)' : 'var(--s3)', false),
+      cell(P.neither, 'both wrong', 'var(--muted)', false)),
+    h('p', {}, agent
+      ? `Of the ${P.only_first + P.only_second} cases where exactly one of them was right, the agent was the one ${P.only_first} times and Tev1 ${P.only_second} times (exact sign test, ${fmtP(P.p)}). Tev1 never found a file the agent missed on this sample.`
+      : `Of the ${P.only_first + P.only_second} cases where exactly one was right, Tev1 was the one ${P.only_first} times and the embedding model ${P.only_second} times (exact sign test, ${fmtP(P.p)}): a statistical tie. A 300M-parameter embedding model on file paths did as well.`),
+    h('p', { class: 'muted', style: 'font-size:14px' }, agent
+      ? `On this same 60-case sample the embedding model beat Tev1 only narrowly (33% vs 28%), and the agent beat the embedding model ${D.paired_sub.agent_vs_embed.only_first} to ${D.paired_sub.agent_vs_embed.only_second} in discordant cases.`
+      : 'Tev1 also scored the same with the task in the state field instead of the question (discordant 8 vs 6, p = 0.79).'));
+}
+seg('#seg-pair', renderPair);
+
+/* ---------- calibration ---------- */
+const BINS = [[0, .25], [.25, .5], [.5, .75], [.75, .9], [.9, 1.01]];
+function renderCalib() {
+  const root = $('#chart-calib'); root.replaceChildren();
+  const W = Math.max(280, root.clientWidth || 600), H = 250, m = { l: 40, r: 10, t: 12, b: 56 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Observed accuracy by stated probability bin for Tev1; accuracy rises only weakly with stated probability.' });
+  const y = v => m.t + ph * (1 - v / 100);
+  [0, 25, 50, 75, 100].forEach(g => {
+    svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y(g), y2: y(g), style: `stroke:var(${g === 0 ? '--axis' : '--grid'});stroke-width:1` }),
+               s('text', { x: m.l - 8, y: y(g) + 4, 'text-anchor': 'end' }, g + '%'));
+  });
+  const slot = pw / BINS.length;
+  BINS.forEach(([lo, hi], i) => {
+    const g = D.reliability_rows.filter(r => r[0] >= lo && r[0] < hi);
+    const acc = g.length ? 100 * g.reduce((a, r) => a + r[1], 0) / g.length : 0;
+    const ideal = 100 * ((lo + Math.min(hi, 1)) / 2);
+    const cx = m.l + slot * i + slot / 2, bw = Math.min(24, slot - 20);
+    const grp = s('g', { class: 'hit' });
+    grp.append(s('rect', { class: 'col', x: cx - slot / 2, y: m.t, width: slot, height: ph + m.b - 14, style: 'fill:transparent' }),
+               s('path', { class: 'col', d: `M${cx - bw / 2},${y(0)} V${y(acc) + 4} q0,-4 4,-4 h${bw - 8} q4,0 4,4 V${y(0)} z`, style: 'fill:var(--s2)' }));
+    grp.append(s('line', { x1: cx - bw / 2 - 8, x2: cx + bw / 2 + 8, y1: y(ideal), y2: y(ideal), style: 'stroke:var(--ink);stroke-width:2' }));
+    grp.append(s('text', { x: cx, y: y(acc) - 6, 'text-anchor': 'middle', class: 'ink', style: 'font-weight:650;font-size:13.5px' }, R0(acc) + '%'));
+    const lbl = `${R0(lo * 100)}–${R0(Math.min(hi, 1) * 100)}%`;
+    grp.append(s('text', { x: cx, y: H - m.b + 18, 'text-anchor': 'middle', class: 'ink2' }, lbl),
+               s('text', { x: cx, y: H - m.b + 35, 'text-anchor': 'middle' }, 'n = ' + g.length));
+    attachTip(grp, `Stated probability ${lbl}`, [`${R0(acc)}% were right (${g.reduce((a, r) => a + r[1], 0)} of ${g.length})`, `If calibrated: about ${R0(ideal)}%`]);
+    svg.append(grp);
+  });
+  svg.append(s('text', { x: m.l + pw / 2, y: H - 2, 'text-anchor': 'middle' }, 'Tev1’s stated probability for its pick'));
+  root.append(svg);
+  const t = $('#table-labels');
+  t.replaceChildren(h('thead', {}, h('tr', {}, h('th', {}, 'Tev1’s own label'), h('th', { class: 'num' }, 'Cases'), h('th', { class: 'num' }, 'Top pick right'), h('th', { class: 'num' }, '95% interval'))),
+    h('tbody', {}, ...[['STRONG', 'clear leader (p ≥ 0.75, margin ≥ 0.30)'], ['WEAK', 'close call'], ['UNSURE', 'top answer was “none of these”']].map(([k, d]) => {
+      const L = D.labels[k]; return h('tr', {}, h('td', {}, `${k} · ${d}`), h('td', { class: 'num' }, L.n), h('td', { class: 'num' }, R0(L.acc[0]) + '%'), h('td', { class: 'num' }, `${R0(L.acc[1])}–${R0(L.acc[2])}%`));
+    })));
+}
+
+/* ---------- policy simulator ---------- */
+function policyAcc(t) { const r = D.policy_rows; return 100 * r.reduce((a, x) => a + (x.p >= t ? x.tev_ok : x.agent_ok), 0) / r.length; }
+function renderPolicy() {
+  const t = +$('#thr').value / 100; $('#thr-out').textContent = t.toFixed(2);
+  const root = $('#chart-policy'); root.replaceChildren();
+  const W = Math.max(280, root.clientWidth || 600), H = 230, m = { l: 40, r: 14, t: 14, b: 40 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const x = v => m.l + pw * v, y = v => m.t + ph * (1 - v / 100);
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Accuracy of the follow-Tev1-above-a-threshold policy versus threshold; it never exceeds the agent alone at 70%.' });
+  [0, 25, 50, 75, 100].forEach(g => svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y(g), y2: y(g), style: `stroke:var(${g === 0 ? '--axis' : '--grid'})` }), s('text', { x: m.l - 8, y: y(g) + 4, 'text-anchor': 'end' }, g + '%')));
+  [0, .25, .5, .75, 1].forEach(g => svg.append(s('text', { x: x(g), y: H - 20, 'text-anchor': g === 0 ? 'start' : g === 1 ? 'end' : 'middle' }, g.toFixed(2))));
+  svg.append(s('text', { x: m.l + pw / 2, y: H - 3, 'text-anchor': 'middle' }, 'threshold (0 = always follow Tev1, 1 = never)'));
+  const agentAlone = policyAcc(1.01);
+  svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y(agentAlone), y2: y(agentAlone), style: 'stroke:var(--s1);stroke-width:2' }),
+             s('text', { x: m.l + 6, y: y(agentAlone) - 7, 'text-anchor': 'start', class: 'ink2' }, `Agent alone ${R0(agentAlone)}%`));
+  let d = ''; for (let i = 0; i <= 100; i++) d += (i ? 'L' : 'M') + x(i / 100).toFixed(1) + ',' + y(policyAcc(i / 100)).toFixed(1);
+  svg.append(s('path', { d, style: 'fill:none;stroke:var(--s2);stroke-width:2;stroke-linejoin:round;stroke-linecap:round' }));
+  const cur = policyAcc(t);
+  svg.append(s('line', { x1: x(t), x2: x(t), y1: m.t, y2: m.t + ph, style: 'stroke:var(--axis);stroke-width:1' }),
+             s('circle', { cx: x(t), cy: y(cur), r: 5.5, style: 'fill:var(--s2);stroke:var(--surface);stroke-width:2' }));
+  root.append(svg);
+  const followed = D.policy_rows.filter(r => r.p >= t);
+  const tevOk = followed.reduce((a, r) => a + r.tev_ok, 0), agOk = followed.reduce((a, r) => a + r.agent_ok, 0);
+  const tile = (v, l) => h('div', { class: 'tile' }, h('span', { class: 'l' }, l), h('div', { class: 'v' }, v));
+  $('#policy-read').replaceChildren(tile(R0(cur) + '%', 'Accuracy of this policy'), tile(R0(agentAlone) + '%', 'Agent alone'),
+    tile(`${followed.length} / ${D.policy_rows.length}`, 'Cases where Tev1 was followed'), tile(`${tevOk} vs ${agOk}`, 'On those: Tev1 right vs agent right'));
+}
+$('#thr').addEventListener('input', renderPolicy);
+
+/* ---------- token calculator ---------- */
+const calc = { adv: 1 };
+seg('#seg-adv', v => { calc.adv = +v; renderTokens(); });
+['#k-ctx', '#k-acc', '#k-r', '#k-R'].forEach(id => $(id).addEventListener('input', renderTokens));
+const kfmt = n => Math.abs(n) >= 1000 ? (n / 1000).toFixed(Math.abs(n) >= 10000 ? 0 : 1) + 'k' : String(R0(n));
+function renderTokens() {
+  const C = Math.round(1000 * Math.pow(500, +$('#k-ctx').value / 1000)), a = +$('#k-acc').value / 100,
+        r = +$('#k-r').value / 100, Rr = +$('#k-R').value, b = calc.adv, overhead = 150, rd = 606;
+  $('#o-ctx').textContent = kfmt(C) + ' tokens' + (Math.abs(C - 261202) < 20000 ? ' (measured median)' : '');
+  $('#o-acc').textContent = R0(a * 100) + '%'; $('#o-r').textContent = R0(r * 100) + '%'; $('#o-R').textContent = Rr;
+  const w = x => (1 - x) / Math.max(x, 0.02);
+  const consult = overhead + C * r;
+  const wrong = rd * (1 + r * Rr) + C * r;
+  const saved = (w(a) - w(b)) * wrong, net = saved - consult;
+  const tile = (v, l) => h('div', { class: 'tile' }, h('span', { class: 'l' }, l), h('div', { class: 'v' }, v));
+  $('#tok-read').replaceChildren(tile(kfmt(consult), 'Cost of one consult'), tile((saved >= 0 ? '' : '−') + kfmt(Math.abs(saved)), 'Wrong-read cost avoided'),
+    tile((net >= 0 ? '+' : '−') + kfmt(Math.abs(net)), 'Net per decision'));
+  const dw = w(a) - w(b);
+  let msg;
+  if (net >= 0) msg = 'At these settings a consult pays for itself.';
+  else if (dw <= 0) msg = 'The advisor is no more accurate than the agent here, so it can only add cost.';
+  else msg = 'At these settings a consult costs more than the wrong reads it prevents.';
+  if (dw > 0 && dw < 1) {
+    const num = dw * rd * (1 + r * Rr) - overhead;
+    if (num > 0) { const cstar = num / (r * (1 - dw)); msg += ` Break-even needs a context under about ${kfmt(cstar)} tokens at this advisor accuracy.`; }
+    else msg += ' The advisor cannot break even at any context size under these assumptions.';
+  }
+  $('#tok-verdict').textContent = msg;
+}
+
+/* ---------- boot ---------- */
+function boot() { renderMethods(); renderRepos(); renderPair('agent'); renderCalib(); renderPolicy(); renderTokens(); }
+boot();
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { renderCalib(); renderPolicy(); }, 120); });
+</script>
+</body>
+</html>
